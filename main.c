@@ -161,23 +161,23 @@ void init_ADC(void)
 		// ADC_SAMPLE_TIME_3  = 3TAD　これは，the number of A/D clocks between the start　of acquisition and the start of conversion.
 		// また，The ADC conversion requires 14 TADとあるので， A/D変換の所要速度は　3TAD + 14TAD = 17 * 120ns = 2.040 us  →　490ksps と求められる．
 
-		AD1CON1 = ADC_MODULE_ON 
-                & ADC_IDLE_CONTINUE
+		AD1CON1	= ADC_MODULE_ON 
+				& ADC_IDLE_CONTINUE
 				& ADC_AD12B_12BIT 
-                & ADC_FORMAT_SIGN_FRACT 
+				& ADC_FORMAT_SIGN_FRACT 
 				& ADC_CLK_TMR 
-                & ADC_AUTO_SAMPLING_ON
+				& ADC_AUTO_SAMPLING_ON
 				& ADC_SAMP_OFF;
         
-		AD1CON2 = ADC_VREF_AVDD_AVSS 
-                & ADC_SCAN_OFF 
-                & ADC_SELECT_CHAN_0
-                & ADC_DMA_ADD_INC_1 
-                & ADC_ALT_BUF_OFF 
-				&ADC_ALT_INPUT_OFF;
+		AD1CON2	= ADC_VREF_AVDD_AVSS 
+				& ADC_SCAN_OFF 
+				& ADC_SELECT_CHAN_0
+				& ADC_DMA_ADD_INC_1 
+				& ADC_ALT_BUF_OFF 
+				& ADC_ALT_INPUT_OFF;
          
-		AD1CON3 = ADC_SAMPLE_TIME_3 
-                & ADC_CONV_CLK_SYSTEM 
+		AD1CON3	= ADC_SAMPLE_TIME_3 
+				& ADC_CONV_CLK_SYSTEM 
 				& ADC_CONV_CLK_7Tcy;
                
 		AD1CON4 = 0;
@@ -209,14 +209,14 @@ void init_DAC(void)
 {
 		// PLL out = AUX_CLK  = 100MHz,  DAC clock = (AUX_CLK_DIV_by_4)*(DAC_CLK_DIV_by_1)
 		//   = 25MHz (which must not exceed 25.6 MHz)
-		ACLKCON = FRC_PLL_FOR_AUX_CLK_DIV 
-                & AUX_CLK_DIV_by_4;
+		ACLKCON	= FRC_PLL_FOR_AUX_CLK_DIV 
+				& AUX_CLK_DIV_by_4;
         
-		DAC1CON = DAC_MODULE_ON 
-                & DAC_IDLE_STOP 
-                & DAC_SLEEP_DISABLED 
+		DAC1CON	= DAC_MODULE_ON 
+				& DAC_IDLE_STOP 
+				& DAC_SLEEP_DISABLED 
 				& DAC_FORMAT_SIGN_INT 
-                & DAC_CLK_DIV_by_1;
+				& DAC_CLK_DIV_by_1;
         
 		DAC1STAT = RIGHT_CH_OUT_ENABLE;// 右CHへ出力
 		DAC1DFLT = DAC_DEFAULT_VALUE_ZERO;
@@ -244,29 +244,28 @@ void initBeatFreq(void)
 /// メイン関数
 void main(void)
 {
-    	// Fosc= Fin * M / (N1 * N2), Fcy = Fosc / 2
-    	// Fosc= 10 MHz * 40 / (2 * 2) = 100MHz, Fcy = Fosc/2 = 50MHz
-    	PLLFBD = 38;                		// M=40
-    	CLKDIVbits.PLLPOST = 0;     	// N1=2
-    	CLKDIVbits.PLLPRE = 0;      	// N2=2
+	// Fosc= Fin * M / (N1 * N2), Fcy = Fosc / 2
+	// Fosc= 10 MHz * 40 / (2 * 2) = 100MHz, Fcy = Fosc/2 = 50MHz
+	PLLFBD = 38;                		// M=40
+	CLKDIVbits.PLLPOST = 0;     	// N1=2
+	CLKDIVbits.PLLPRE = 0;      	// N2=2
 
-    	// ウォッチドッグタイマーオフ
-    	RCONbits.SWDTEN = 0;
+	RCONbits.SWDTEN = 0;
 
-    	// PLLロック待ち
-    	while(OSCCONbits.LOCK !=1 );		// 以上の5行はdsPIC33F独特の設定．
+	// PLLロック待ち
+	while(OSCCONbits.LOCK !=1 );
 
 	// ポート初期設定
 	TRISAbits.TRISA0 = 	1;			// RA0( = AN0 A/D変換入力端子） 入力設定，Aポートの他のピンは全て出力設定          
 	TRISB = 	0x0;				// Bポートは全て出力設定
 
 	// 周辺モジュール設定
-	init_Timer();					// Timer3　設定
-	init_ADC();						//A/D変換モジュール 初期設定
-	init_DAC();						// D/A変換モジュール初期設定
+	init_Timer();
+	init_ADC();
+	init_DAC();
 
 	// フィルタ設定
-	init_Filter(); 						// フィルタ初期化
+	init_Filter();
     
     initBeatFreq();
 
