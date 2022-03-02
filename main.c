@@ -94,20 +94,20 @@ void __attribute__((interrupt, no_auto_psv)) _ADC1Interrupt (void)
 long tmp1, tmp2, product;
 
     //ビート周波数混合
-        tmp1 = ADCBUF0;
-        tmp2 = bf[bfIndex++];
-        bfIndex %= bfSIZE;
+    tmp1 = ADCBUF0;
+    tmp2 = bf[bfIndex++];
+    bfIndex %= bfSIZE;
     
-        product = tmp1 * tmp2;   //long(32ビット)変数に入れてから乗算する。
-        product = product >> 14; //Q15フォーマット同士の乗算はQ30になるのでQ15に戻すために15ビット右シフト処理する。
-        MixedSignal = (int)product;//int(16ビット)変数にキャストする。
+    product = tmp1 * tmp2;   //long(32ビット)変数に入れてから乗算する。
+    product = product >> 14; //Q15フォーマット同士の乗算はQ30になるのでQ15に戻すために15ビット右シフト処理する。
+    MixedSignal = (int)product;//int(16ビット)変数にキャストする。
     
 
-        /// ローパスフィルタリング
-		FIR(1, &Sig_LP_Out[0], &MixedSignal,  &FIR_SDR_LPFilter);	
-		DAC1RDAT = Sig_LP_Out[0]*Volume;								// D/A変換モジュールへの出力 (RIGHT DATA REGISTERへ)
+    /// ローパスフィルタリング
+	FIR(1, &Sig_LP_Out[0], &MixedSignal,  &FIR_SDR_LPFilter);	
+	DAC1RDAT = Sig_LP_Out[0]*Volume;								// D/A変換モジュールへの出力 (RIGHT DATA REGISTERへ)
 
- 	 	IFS0bits.AD1IF = 0;													//Clear the ADC1Interrupt Flag
+ 	IFS0bits.AD1IF = 0;													//Clear the ADC1Interrupt Flag
 }
 
 
