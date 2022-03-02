@@ -2,7 +2,7 @@
 *　
 40kHz JJY放送信号受信ソフトウェアラジオ  with dsPIC33FJ64GP802 (2022/2/18) 
                        
-A/D変換 → ビート周波数混合 → バンドパスフィルタリング→ ローパスフィルタリング → D/A変換
+A/D変換 → ビート周波数混合 → ローパスフィルタリング → D/A変換
 
 A/Dサンプリング周波数 50MHz/256 = 195.3 kHz
 
@@ -62,40 +62,36 @@ A/Dサンプリング周波数 50MHz/256 = 195.3 kHz
 
 
 // FIR用構造体の宣言***
-FIRStruct FIR_SDR_BPFilter;
 FIRStruct FIR_SDR_LPFilter;
 
 // 遅延素子(delay)を用意 ***
-fractional BPFilterDelay[NUM_TAPS] __attribute__ ((section(".ybss, bss, ymemory"), far, aligned ( 128 ))); // 2byte x 64個 分の領域を確保
 fractional LPFilterDelay[NUM_TAPS] __attribute__ ((section(".ybss, bss, ymemory"), far, aligned ( 128 ))); // 2byte x 64個 分の領域を確保
 
 // データ格納配列宣言 for Filter
 #define	MaxSize	1				// サンプリング数  リアルタイム処理であれば　１
 fractional SigIn[MaxSize];			// 入力データ
-fractional Sig_BP_Out[MaxSize];		// BPフィルタ出力
 fractional Sig_LP_Out[MaxSize];		// LPフィルタ出力
 fractional MixedSignal;
 
-// beat frequencyの準備
-#define bfSIZE  6   // = Sampling freq / Beat freq = 195.3kHz / 32.25kHz
+// ビート周波数 (39.06kHz) の準備
+#define bfSIZE  5   // = Sampling freq / Beat freq = 195.3kHz / 39.06kHz
 fractional bf[bfSIZE];
 unsigned int bfIndex = 0;
 
-//void initBeatFreq(void);
+void initBeatFreq(void);
 
 // 音量ボリューム設定
-#define			Volume	       100		// 	
+#define Volume  32		// 	
 
 //サンプリング周期設定
-#define			ADsamp_195kHz  		256 	// タイマ3の周期設定　(50MHz/256 = 195.3kHz, (Fcy = Fosc/2 = 50MHz) )
-												// タイマ3によりA/D変換モジュールの起動を行う設定であるので，この周期により
-												//A/D変換モジュールのサンプリング周期を設定する．
+#define ADsamp_195kHz   256 	// タイマ3の周期設定　(50MHz/256 = 195.3kHz, (Fcy = Fosc/2 = 50MHz) )
+								// タイマ3によりA/D変換モジュールの起動を行う設定であるので，この周期により
+								//A/D変換モジュールのサンプリング周期を設定する．
 
 // 復調関数(ADC1Interrrupt)　A/D変換終了時に割り込みがかかり，この関数が起動される．
 void __attribute__((interrupt, no_auto_psv)) _ADC1Interrupt (void)
 {
 long tmp1, tmp2, product;
-fractional  demodulated;
 
     //ビート周波数混合
         tmp1 = ADCBUF0;
@@ -106,14 +102,8 @@ fractional  demodulated;
         product = product >> 14; //Q15フォーマット同士の乗算はQ30になるのでQ15に戻すために15ビット右シフト処理する。
         MixedSignal = (int)product;//int(16ビット)変数にキャストする。
     
-	//バンドパスフィルタリング
-		FIR(1, &Sig_BP_Out[0], &MixedSignal,  &FIR_SDR_BPFilter);		
-            
-	// 全波整流
-		//if(Sig_BP_Out[0] < 0)
-		demodulated = Sig_BP_Out[0];// < 0)? -Sig_BP_Out[0] : Sig_BP_Out[0];	
 
-	/// ローパスフィルタリング
+        /// ローパスフィルタリング
 		FIR(1, &Sig_LP_Out[0], &MixedSignal,  &FIR_SDR_LPFilter);	
 		DAC1RDAT = Sig_LP_Out[0]*Volume;								// D/A変換モジュールへの出力 (RIGHT DATA REGISTERへ)
 
@@ -124,11 +114,11 @@ fractional  demodulated;
 // タイマ3モジュール　初期設定　　A/D変換モジュールはTimer3により起動される．
 void init_Timer(void)
 {
-		unsigned int TM3Config = T3_ON & T3_GATE_OFF & T3_PS_1_1&  T3_SOURCE_INT;
+	unsigned int TM3Config = T3_ON & T3_GATE_OFF & T3_PS_1_1&  T3_SOURCE_INT;
 
-		OpenTimer3(TM3Config, ADsamp_195kHz-1);			//Timer3初期設定
-																//A/D変換モジュールのサンプリング周期を
-																//Fcy/ADsamp_195kHz = 195kHz に設定
+	OpenTimer3(TM3Config, ADsamp_195kHz-1);			//Timer3初期設定
+													//A/D変換モジュールのサンプリング周期を
+													//Fcy/ADsamp_195kHz = 195kHz に設定
 }
 
 
@@ -136,13 +126,9 @@ void init_Timer(void)
 void init_Filter(void)
 {
     //  Initialize FIR filter structure ***
-    FIRStructInit(&FIR_SDR_BPFilter, NUM_TAPS, (fractional *)__builtin_psvoffset(bpfCoeffs),
-            (int) __builtin_psvpage(bpfCoeffs), BPFilterDelay);
-    
     FIRStructInit(&FIR_SDR_LPFilter, NUM_TAPS, (fractional *)__builtin_psvoffset(lpfCoeffs),
             (int) __builtin_psvpage(lpfCoeffs), LPFilterDelay);
     
-	FIRDelayInit(&FIR_SDR_BPFilter);
 	FIRDelayInit(&FIR_SDR_LPFilter);
 }
 
@@ -231,13 +217,13 @@ void initBeatFreq(void)
         bf}[i] = (fractional)Q15(sin(2 * PI * i / bfSIZE);
      }
      */
-        
+    
     bf[0] = (fractional)Q15(0.0);
-    bf[1] = (fractional)Q15(0.86603); // sin(2PI*1/6)
-    bf[2] = (fractional)Q15(0.86603); // sin(2PI*2/6)
-    bf[3] = (fractional)Q15(0.0);
-    bf[4] = (fractional)Q15(-0.86603); // sin(2PI*4/6)
-    bf[5] = (fractional)Q15(-0.86603); // sin(2PI*5/6)
+    bf[1] = (fractional)Q15(0.951056);   // sin(2PI*1/5)
+    bf[2] = (fractional)Q15(0.587785);   // sin(2PI*2/5)
+    bf[3] = (fractional)Q15(-0.587785);  // sin(2PI*3/5)
+    bf[4] = (fractional)Q15(-0.951056);  // sin(2PI*4/5)
+    
 }
 
 
@@ -256,8 +242,8 @@ void main(void)
 	while(OSCCONbits.LOCK !=1 );
 
 	// ポート初期設定
-	TRISAbits.TRISA0 = 	1;			// RA0( = AN0 A/D変換入力端子） 入力設定，Aポートの他のピンは全て出力設定          
-	TRISB = 	0x0;				// Bポートは全て出力設定
+	TRISAbits.TRISA0 = 	1;		// RA0( = AN0 A/D変換入力端子） 入力設定，Aポートの他のピンは全て出力設定          
+	TRISB = 0x0;				// Bポートは全て出力設定
 
 	// 周辺モジュール設定
 	init_Timer();
