@@ -4,7 +4,7 @@
                        
 A/D変換 → ビート周波数混合 → ローパスフィルタリング → D/A変換
 
-A/Dサンプリング周波数 50MHz/256 = 195.3 kHz
+A/Dサンプリング周波数 40MHz/256 = 156.25 kHz
 
 *************************************************/
 #include "p33fj64gp802.h"
@@ -41,8 +41,8 @@ A/Dサンプリング周波数 50MHz/256 = 195.3 kHz
 #pragma config IESO = ON                // Internal External Switch Over Mode (Start-up device with FRC, then automatically switch to user-selected oscillator source when ready)
 
 // FOSC
-#pragma config POSCMD = XT              // Primary Oscillator Source (XT Oscillator Mode)
-#pragma config OSCIOFNC = ON            // OSC2 Pin Function (OSC2 pin has digital I/O function)
+#pragma config POSCMD = HS              // Primary Oscillator Source (HS Oscillator Mode)
+#pragma config OSCIOFNC = OFF           // OSC2 Pin Function (OSC2 pin has clock out function)
 #pragma config IOL1WAY = ON             // Peripheral Pin Select Configuration (Allow Only One Re-configuration)
 #pragma config FCKSM = CSDCMD           // Clock Switching and Monitor (Both Clock Switching and Fail-Safe Clock Monitor are disabled)
 
@@ -61,20 +61,19 @@ A/Dサンプリング周波数 50MHz/256 = 195.3 kHz
 #pragma config JTAGEN = OFF             // JTAG Port Enable (JTAG is Disabled)
 
 
+
 // FIR用構造体の宣言***
 FIRStruct FIR_SDR_LPFilter;
 
 // 遅延素子(delay)を用意 ***
-fractional LPFilterDelay[NUM_TAPS] __attribute__ ((section(".ybss, bss, ymemory"), far, aligned ( 128 ))); // 2byte x 64個 分の領域を確保
+fractional LPFilterDelay[NUM_TAPS] __attribute__ ((section(".ybss, bss, ymemory"), far, aligned ( 256 ))); // 2byte x 127個 分の領域を確保
 
 // データ格納配列宣言 for Filter
-#define	MaxSize	1				// サンプリング数  リアルタイム処理であれば　１
-fractional SigIn[MaxSize];			// 入力データ
-fractional Sig_LP_Out[MaxSize];		// LPフィルタ出力
+fractional Sig_LP_Out[1];		// LPフィルタ出力
 fractional MixedSignal;
 
 // ビート周波数 (39.06kHz) の準備
-#define bfSIZE  5   // = Sampling freq / Beat freq = 195.3kHz / 39.06kHz
+#define bfSIZE  4   // = Sampling freq / Beat freq = 156.253kHz / 39.625kHz
 fractional bf[bfSIZE];
 unsigned int bfIndex = 0;
 
@@ -84,9 +83,7 @@ void initBeatFreq(void);
 #define Volume  32		// 	
 
 //サンプリング周期設定
-#define ADsamp_195kHz   256 	// タイマ3の周期設定　(50MHz/256 = 195.3kHz, (Fcy = Fosc/2 = 50MHz) )
-								// タイマ3によりA/D変換モジュールの起動を行う設定であるので，この周期により
-								//A/D変換モジュールのサンプリング周期を設定する．
+#define ADsamp_156kHz   256 	// タイマ3の周期設定　(40MHz/256 = 156.25kHz, (Fcy = Fosc/2 = 40MHz) )
 
 // 復調関数(ADC1Interrrupt)　A/D変換終了時に割り込みがかかり，この関数が起動される．
 void __attribute__((interrupt, no_auto_psv)) _ADC1Interrupt (void)
@@ -99,7 +96,7 @@ long tmp1, tmp2, product;
     bfIndex %= bfSIZE;
     
     product = tmp1 * tmp2;   //long(32ビット)変数に入れてから乗算する。
-    product = product >> 14; //Q15フォーマット同士の乗算はQ30になるのでQ15に戻すために15ビット右シフト処理する。
+    product = product >> 14; //Q15フォーマット同士の乗算はQ30になるのでQ15に戻すために15ビット右シフト処理するが、結果を２倍にしたいので14右シフトする。
     MixedSignal = (int)product;//int(16ビット)変数にキャストする。
     
 
@@ -116,9 +113,7 @@ void init_Timer(void)
 {
 	unsigned int TM3Config = T3_ON & T3_GATE_OFF & T3_PS_1_1&  T3_SOURCE_INT;
 
-	OpenTimer3(TM3Config, ADsamp_195kHz-1);			//Timer3初期設定
-													//A/D変換モジュールのサンプリング周期を
-													//Fcy/ADsamp_195kHz = 195kHz に設定
+	OpenTimer3(TM3Config, ADsamp_156kHz - 1);			//Timer3初期設定
 }
 
 
@@ -140,12 +135,12 @@ void init_ADC(void)
 		// AN0入力設定
 		// Timer3 起動
 
-		// セラミック発振子10MHz， Tcy = 1/(50 MHz)  
-		// データシートのTable 21-37  VDD 3.0 V で　TAD > 118 nsec
-		//  118 nsec < TAD =  Tcy *(ADCS +1)  = (1/50MHz) (ADCS + 1)   これより    ADCS > 4.9 出なければならない．よって　ADCS = 5 とすると 　TAD = 6Tcy = 120ns　とすればよい．
+		//  Tcy = 1/(クロック周波数:40 MHz)  
+		// データシートのTable 30-44  によると ADC clock period は　min.  117.6 ns
+		//  117.6 ns < TAD =  5Tcy  = 5 x (1/40MHz) = 5 x 25 ns = 125 ns  (ADC Conversion Clock Selectにより 5Tcy を設定する)
 		// 以下はA/D変換モジュールの変換速度の計算 
-		// ADC_SAMPLE_TIME_3  = 3TAD　これは，the number of A/D clocks between the start　of acquisition and the start of conversion.
-		// また，The ADC conversion requires 14 TADとあるので， A/D変換の所要速度は　3TAD + 14TAD = 17 * 120ns = 2.040 us  →　490ksps と求められる．
+		// Tsamp(Sample Time)  = 3 TAD
+		// FCNV(Conversion Time) = 14 TADとあるので， A/D変換の所要速度は　3TAD + 14TAD = 17TAD * 125ns = 2.125 us  →　470ksps と求められる．
 
 		AD1CON1	= ADC_MODULE_ON 
 				& ADC_IDLE_CONTINUE
@@ -164,7 +159,7 @@ void init_ADC(void)
          
 		AD1CON3	= ADC_SAMPLE_TIME_3 
 				& ADC_CONV_CLK_SYSTEM 
-				& ADC_CONV_CLK_7Tcy;
+				& ADC_CONV_CLK_5Tcy;
                
 		AD1CON4 = 0;
         
@@ -193,8 +188,8 @@ void init_ADC(void)
 // D/A変換モジュール初期設定
 void init_DAC(void)
 {
-		// PLL out = AUX_CLK  = 100MHz,  DAC clock = (AUX_CLK_DIV_by_4)*(DAC_CLK_DIV_by_1)
-		//   = 25MHz (which must not exceed 25.6 MHz)
+		// PLL out = AUX_CLK  = 80MHz,  DAC clock = (AUX_CLK_DIV_by_4)*(DAC_CLK_DIV_by_1)
+		//   = 20MHz (which must not exceed 25.6 MHz)
 		ACLKCON	= FRC_PLL_FOR_AUX_CLK_DIV 
 				& AUX_CLK_DIV_by_4;
         
@@ -217,13 +212,11 @@ void initBeatFreq(void)
         bf}[i] = (fractional)Q15(sin(2 * PI * i / bfSIZE);
      }
      */
-    
+
     bf[0] = (fractional)Q15(0.0);
-    bf[1] = (fractional)Q15(0.951056);   // sin(2PI*1/5)
-    bf[2] = (fractional)Q15(0.587785);   // sin(2PI*2/5)
-    bf[3] = (fractional)Q15(-0.587785);  // sin(2PI*3/5)
-    bf[4] = (fractional)Q15(-0.951056);  // sin(2PI*4/5)
-    
+    bf[1] = (fractional)Q15(1.0);
+    bf[2] = (fractional)Q15(0.0);
+    bf[3] = (fractional)Q15(-1.0);
 }
 
 
@@ -231,8 +224,8 @@ void initBeatFreq(void)
 void main(void)
 {
 	// Fosc= Fin * M / (N1 * N2), Fcy = Fosc / 2
-	// Fosc= 10 MHz * 40 / (2 * 2) = 100MHz, Fcy = Fosc/2 = 50MHz
-	PLLFBD = 38;                		// M=40
+	// Fosc= 10 MHz * 32 / (2 * 2) = 80MHz, Fcy = Fosc/2 = 40MHz
+	PLLFBD = 30;                	// M=32 (for Fosc = 80MHz)
 	CLKDIVbits.PLLPOST = 0;     	// N1=2
 	CLKDIVbits.PLLPRE = 0;      	// N2=2
 
