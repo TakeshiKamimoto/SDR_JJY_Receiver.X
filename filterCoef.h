@@ -1,8 +1,8 @@
 //フィルタ係数 for FIR  ローパスフィルタ********************************************
 
-//#define TAP100_3000kHz 1
 //#define TAP72_3000kHz   1
-#define TAP100_5000kHz 1
+#define TAP100_3000kHz 1
+//#define TAP100_5000kHz 1
 
 
 #ifdef  TAP100_3000kHz
