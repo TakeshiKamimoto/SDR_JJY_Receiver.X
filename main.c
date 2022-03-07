@@ -207,6 +207,7 @@ void init_DAC(void)
 void initBeatFreq(void)
 {
     /*
+     ビート周波数生成用数値テーブル
      int i;
      for(i = 0; i < bfSIZE; i++){
         bf}[i] = (fractional)Q15(sin(2 * PI * i / bfSIZE);
