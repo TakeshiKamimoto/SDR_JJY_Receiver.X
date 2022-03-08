@@ -72,8 +72,8 @@ fractional LPFilterDelay[NUM_TAPS] __attribute__ ((section(".ybss, bss, ymemory"
 fractional Sig_LP_Out[1];		// LPフィルタ出力
 fractional MixedSignal;
 
-// ビート周波数 (39.06kHz) の準備
-#define bfSIZE  4   // = Sampling freq / Beat freq = 156.253kHz / 39.625kHz
+// ビート周波数  の準備
+#define bfSIZE  4   // = Sampling freq / Beat freq = 156.253kHz / 39.0625kHz
 fractional bf[bfSIZE];
 unsigned int bfIndex = 0;
 
