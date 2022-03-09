@@ -90,7 +90,7 @@ void __attribute__((interrupt, no_auto_psv)) _ADC1Interrupt (void)
 {
 /*long tmp1, tmp2, product;
 
-    //ビート信号混合
+    //ビート発生用信号混合
     tmp1 = ADCBUF0;
     tmp2 = bf[bfIndex++];
     bfIndex %= bfSIZE;
@@ -99,16 +99,16 @@ void __attribute__((interrupt, no_auto_psv)) _ADC1Interrupt (void)
     product = product >> 14; //Q15フォーマット同士の乗算はQ30になるのでQ15に戻すために15ビット右シフト処理するが、結果を２倍にしたいので14右シフトする。
     MixedSignal = (int)product;//int(16ビット)変数にキャストする。
 */    
-    /// ビート信号ミキシング演算（乗算）
+    /// ビート発生用信号ミキシング演算（ベクトル乗算dsp関数）
     MixedSignal = VectorDotProduct(1, &ADCBUF0, &bf[bfIndex]);
     bfIndex++;
     bfIndex %= bfSIZE;
 
     /// ローパスフィルタリング
 	FIR(1, &Sig_LP_Out, &MixedSignal,  &FIR_SDR_LPFilter);	
-	DAC1RDAT = Sig_LP_Out*Volume;								// D/A変換モジュールへの出力 (RIGHT DATA REGISTERへ)
+	DAC1RDAT = Sig_LP_Out*Volume;       // D/A変換モジュールへの出力 (RIGHT DATA REGISTERへ)
 
- 	IFS0bits.AD1IF = 0;													//Clear the ADC1Interrupt Flag
+ 	IFS0bits.AD1IF = 0;     //Clear the ADC1Interrupt Flag
 }
 
 
@@ -117,7 +117,7 @@ void init_Timer(void)
 {
 	unsigned int TM3Config = T3_ON & T3_GATE_OFF & T3_PS_1_1&  T3_SOURCE_INT;
 
-	OpenTimer3(TM3Config, ADsamp_156kHz - 1);			//Timer3初期設定
+	OpenTimer3(TM3Config, ADsamp_156kHz - 1);       //Timer3初期設定
 }
 
 
@@ -211,7 +211,7 @@ void init_DAC(void)
 void initBeatFreq(void)
 {
     /*
-     ビート信号生成用数値テーブル
+     ビート発生用信号生成用数値テーブル
      int i;
      for(i = 0; i < bfSIZE; i++){
         bf}[i] = (fractional)Q15(sin(2 * PI * i / bfSIZE);
@@ -251,7 +251,7 @@ void main(void)
 	// フィルタ設定
 	init_Filter();
     
-    // ビート信号数値テーブル生成
+	// ビート発生用信号数値テーブル生成
 	initBeatFreq();
 
 	while(1) {
