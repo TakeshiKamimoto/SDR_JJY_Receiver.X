@@ -69,7 +69,7 @@ FIRStruct FIR_SDR_LPFilter;
 fractional LPFilterDelay[NUM_TAPS] __attribute__ ((section(".ybss, bss, ymemory"), far, aligned ( 256 ))); // 2byte x 127個 分の領域を確保
 
 // データ格納配列宣言 for Filter
-fractional Sig_LP_Out[1];		// LPフィルタ出力
+fractional Sig_LP_Out;		// LPフィルタ出力
 fractional MixedSignal;
 
 // ビート周波数  の準備
@@ -80,7 +80,7 @@ unsigned int bfIndex = 0;
 void initBeatFreq(void);
 
 // 音量ボリューム設定
-#define Volume  32		// 	
+#define Volume  64		// 	
 
 //サンプリング周期設定
 #define ADsamp_156kHz   256 	// タイマ3の周期設定　(40MHz/256 = 156.25kHz, (Fcy = Fosc/2 = 40MHz) )
@@ -88,9 +88,9 @@ void initBeatFreq(void);
 // 復調関数(ADC1Interrrupt)　A/D変換終了時に割り込みがかかり，この関数が起動される．
 void __attribute__((interrupt, no_auto_psv)) _ADC1Interrupt (void)
 {
-long tmp1, tmp2, product;
+/*long tmp1, tmp2, product;
 
-    //ビート周波数混合
+    //ビート信号混合
     tmp1 = ADCBUF0;
     tmp2 = bf[bfIndex++];
     bfIndex %= bfSIZE;
@@ -98,11 +98,15 @@ long tmp1, tmp2, product;
     product = tmp1 * tmp2;   //long(32ビット)変数に入れてから乗算する。
     product = product >> 14; //Q15フォーマット同士の乗算はQ30になるのでQ15に戻すために15ビット右シフト処理するが、結果を２倍にしたいので14右シフトする。
     MixedSignal = (int)product;//int(16ビット)変数にキャストする。
-    
+*/    
+    /// ビート信号ミキシング演算（乗算）
+    MixedSignal = VectorDotProduct(1, &ADCBUF0, &bf[bfIndex]);
+    bfIndex++;
+    bfIndex %= bfSIZE;
 
     /// ローパスフィルタリング
-	FIR(1, &Sig_LP_Out[0], &MixedSignal,  &FIR_SDR_LPFilter);	
-	DAC1RDAT = Sig_LP_Out[0]*Volume;								// D/A変換モジュールへの出力 (RIGHT DATA REGISTERへ)
+	FIR(1, &Sig_LP_Out, &MixedSignal,  &FIR_SDR_LPFilter);	
+	DAC1RDAT = Sig_LP_Out*Volume;								// D/A変換モジュールへの出力 (RIGHT DATA REGISTERへ)
 
  	IFS0bits.AD1IF = 0;													//Clear the ADC1Interrupt Flag
 }
@@ -207,7 +211,7 @@ void init_DAC(void)
 void initBeatFreq(void)
 {
     /*
-     ビート周波数生成用数値テーブル
+     ビート信号生成用数値テーブル
      int i;
      for(i = 0; i < bfSIZE; i++){
         bf}[i] = (fractional)Q15(sin(2 * PI * i / bfSIZE);
@@ -247,7 +251,8 @@ void main(void)
 	// フィルタ設定
 	init_Filter();
     
-    initBeatFreq();
+    // ビート信号数値テーブル生成
+	initBeatFreq();
 
 	while(1) {
 	}
