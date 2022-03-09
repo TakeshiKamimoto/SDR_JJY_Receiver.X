@@ -66,7 +66,8 @@ A/Dサンプリング周波数 40MHz/256 = 156.25 kHz
 FIRStruct FIR_SDR_LPFilter;
 
 // 遅延素子(delay)を用意 ***
-fractional LPFilterDelay[NUM_TAPS] __attribute__ ((section(".ybss, bss, ymemory"), far, aligned ( 256 ))); // 2byte x 127個 分の領域を確保
+//fractional LPFilterDelay[NUM_TAPS] __attribute__ ((section(".ybss, bss, ymemory"), far, aligned ( 256 ))); // 2byte x 127個 分の領域を確保
+fractional _YBSS(256) LPFilterDelay[NUM_TAPS];
 
 // データ格納配列宣言 for Filter
 fractional Sig_LP_Out;		// LPフィルタ出力
