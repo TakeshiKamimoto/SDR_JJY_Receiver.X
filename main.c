@@ -1,18 +1,19 @@
 /************************************************
-*　
 40kHz JJY放送信号受信ソフトウェアラジオ  with dsPIC33FJ64GP802 (2022/2/18) 
                        
 A/D変換 → ビート周波数混合 → ローパスフィルタリング → D/A変換
 
 A/Dサンプリング周波数 40MHz/256 = 156.25 kHz
 
+ * MPLAB X IDE v5.50
+ * Compiler: XC16 (v1.70)
 *************************************************/
 #include "p33fj64gp802.h"
 #include <stdio.h>
 #include <timer.h>
 #include "adc802.h"
 #include "dac802.h"
-#include <dsp.h>
+#include <dsp.h>    // to use dsp library, "libdsp-elf.a" is to be added under Libraries folder of the project.
 #include <xc.h>
 #include "filterCoef.h"
 
